@@ -1,7 +1,8 @@
 import { Buffer } from 'node:buffer';
+import { XMLParser } from 'fast-xml-parser';
 
 const endpoint =
-  'https://blog.hatena.ne.jp/u0918_nobita/0918nobita.hateblo.jp/atom';
+  'https://blog.hatena.ne.jp/u0918_nobita/0918nobita.hateblo.jp/atom/entry';
 
 const username = process.env['HATENA_ID'];
 const password = process.env['HATENA_API_KEY'];
@@ -20,4 +21,14 @@ if (!res.ok) {
   process.exit(1);
 }
 
-console.log(await res.text());
+const xmlText = await res.text();
+
+const xmlParser = new XMLParser();
+const parsedXml = xmlParser.parse(xmlText);
+
+console.log('title:', parsedXml.feed.title);
+console.log('entries:');
+
+for (const entry of parsedXml.feed.entry) {
+  console.log(entry.title);
+}
