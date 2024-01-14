@@ -1,0 +1,16 @@
+{
+  "name": "hateblo-api",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {},
+  "author": "Kodai Matsumoto <nobita.0918@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "prettier": "^3.2.2",
+    "typescript": "^5.3.3"
+  },
+  "prettier": {
+    "singleQuote": true
+  }
+}
