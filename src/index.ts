@@ -1,16 +1,17 @@
 import { Buffer } from 'node:buffer';
+import { writeFile } from 'node:fs/promises';
 import { XMLParser } from 'fast-xml-parser';
+import { z } from 'zod';
 
-const endpoint =
-  'https://blog.hatena.ne.jp/u0918_nobita/0918nobita.hateblo.jp/atom/entry';
-
-const username = process.env['HATENA_ID'];
-const password = process.env['HATENA_API_KEY'];
+const hatenaId = process.env['HATENA_ID'];
+const domain = process.env['HATENA_DOMAIN'];
+const endpoint = `https://blog.hatena.ne.jp/${hatenaId}/${domain}/atom/entry`;
+const hatenaApiKey = process.env['HATENA_API_KEY'];
 
 const res = await fetch(endpoint, {
   headers: {
     Authorization:
-      'Basic ' + Buffer.from(`${username}:${password}`).toString('base64'),
+      'Basic ' + Buffer.from(`${hatenaId}:${hatenaApiKey}`).toString('base64'),
     'Content-Type': 'application/xml',
   },
 });
@@ -23,12 +24,54 @@ if (!res.ok) {
 
 const xmlText = await res.text();
 
-const xmlParser = new XMLParser();
+await writeFile('response.xml', xmlText, 'utf-8');
+
+const xmlParser = new XMLParser({
+  ignoreAttributes: false,
+  ignoreDeclaration: true,
+});
 const parsedXml = xmlParser.parse(xmlText);
 
-console.log('title:', parsedXml.feed.title);
-console.log('entries:');
+await writeFile('response.json', JSON.stringify(parsedXml), 'utf-8');
 
-for (const entry of parsedXml.feed.entry) {
-  console.log(entry.title);
+const pageSchema = z.object({
+  feed: z.object({
+    title: z.string(),
+    link: z.array(
+      z.object({
+        '@_rel': z.string(),
+        '@_href': z.string(),
+      }),
+    ),
+    entry: z.array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        'app:control': z.object({
+          'app:draft': z.union([z.literal('yes'), z.literal('no')]),
+        }),
+      }),
+    ),
+  }),
+});
+
+const page = pageSchema.safeParse(parsedXml);
+
+if (!page.success) {
+  console.error('Failed to validate');
+  console.error(page.error);
+  process.exit(1);
 }
+
+console.log('title:', page.data.feed.title);
+
+console.log('entries:');
+for (const entry of page.data.feed.entry) {
+  console.log(
+    `  ${entry['app:control']['app:draft'] === 'yes' ? '[draft] ' : ''}${entry.title}`,
+  );
+}
+
+const nextPage = page.data.feed.link.find((link) => link['@_rel'] === 'next');
+
+console.log({ nextPage });
